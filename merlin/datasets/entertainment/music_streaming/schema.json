@@ -28,6 +28,9 @@
           "categorical",
           "item_id",
           "item"
+        ],
+        "extraMetadata": [
+          {"embedding_sizes": {"cardinality": 10000.0}}
         ]
       }
     },

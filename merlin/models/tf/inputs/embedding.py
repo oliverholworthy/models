@@ -64,8 +64,15 @@ class EmbeddingTableBase(Block):
         super(EmbeddingTableBase, self).__init__(trainable=trainable, **kwargs)
         self.dim = dim
 
-        if not col_schema.int_domain:
-            raise ValueError("`col_schema` needs to have a int-domain")
+        if "embedding_sizes" not in col_schema.properties:
+            raise ValueError("`col_schema` needs to have an `embedding_sizes` property set.")
+
+        embedding_sizes = col_schema.properties["embedding_sizes"]
+
+        if "cardinality" not in embedding_sizes:
+            raise ValueError(
+                "`embedding_sizes` property needs to have a `cardinality` property set."
+            )
 
         self.col_schema = col_schema
 
@@ -81,7 +88,7 @@ class EmbeddingTableBase(Block):
 
     @property
     def input_dim(self):
-        return self.col_schema.int_domain.max + 1
+        return int(self.col_schema.properties["embedding_sizes"]["cardinality"]) + 1
 
     def get_config(self):
         config = super().get_config()

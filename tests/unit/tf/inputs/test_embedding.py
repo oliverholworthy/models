@@ -57,7 +57,7 @@ class TestEmbeddingTable:
     sample_column_schema = ColumnSchema(
         "item_id",
         dtype=np.int32,
-        properties={"domain": {"min": 0, "max": 10, "name": "item_id"}},
+        properties={"embedding_sizes": {"cardinality": 10}},
         tags=[Tags.CATEGORICAL],
     )
 
@@ -65,7 +65,7 @@ class TestEmbeddingTable:
         column_schema = ColumnSchema("item_id")
         with pytest.raises(ValueError) as exc_info:
             mm.EmbeddingTable(16, column_schema)
-        assert "needs to have a int-domain" in str(exc_info.value)
+        assert "needs to have an `embedding_sizes` property" in str(exc_info.value)
 
     @pytest.mark.parametrize(
         ["dim", "kwargs", "inputs", "expected_output_shape"],
@@ -157,7 +157,11 @@ class TestEmbeddingTable:
 
     @pytest.mark.parametrize("trainable", [True, False])
     def test_from_pretrained(self, trainable, music_streaming_data: Dataset):
-        vocab_size = music_streaming_data.schema.column_schemas["item_id"].int_domain.max + 1
+        vocab_size = int(
+            music_streaming_data.schema.column_schemas["item_id"].properties["embedding_sizes"][
+                "cardinality"
+            ]
+        )
         embedding_dim = 32
         weights = np.random.rand(vocab_size, embedding_dim)
         pre_trained_weights_df = pd.DataFrame(weights)

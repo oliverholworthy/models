@@ -63,6 +63,7 @@ def create_categorical_column(
         domain_name = name
     if num_items:
         properties["domain"] = {"name": domain_name, "min": 0, "max": num_items}
+        properties["embedding_sizes"] = {"cardinality": num_items}
 
     is_list, is_ragged = False, False
     value_count = {}
