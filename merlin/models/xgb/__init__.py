@@ -57,10 +57,9 @@ class XGBoost:
         self,
         schema: Schema,
         *,
-        target_columns: Optional[Union[str, list]] = None,
         qid_column: Optional[str] = None,
-        objective: str = "reg:squarederror",
         booster: Optional[xgb.Booster] = None,
+        objective: Optional[str] = None,
         **params,
     ):
         """
@@ -68,9 +67,6 @@ class XGBoost:
         ----------
         schema : merlin.schema.Schema
             The schema of the data that will be used to train and evaluate the model.
-        target_columns : Optional[Union[list, str]]
-            The target columns to use. If provided, will be used as the label(s).
-            Otherwise the targets are automatically inferred from the objective and column tags.
         qid_column : Optional[str]
             For ranking objectives. The query ID column. If not provided will use
             the user ID (tagged with merlin.schema.Tags.USER_ID) column.
@@ -80,17 +76,19 @@ class XGBoost:
         **params
             The parameters to use for the XGBoost train method
         """
-        self.params = {**params, "objective": objective}
-
-        target_tag = get_target_tag(objective)
-        if isinstance(target_columns, str):
-            target_columns = [target_columns]
-        self.target_columns = target_columns or get_targets(schema, target_tag)
+        self.target_columns = get_targets(schema)
         self.feature_columns = get_features(schema, self.target_columns)
 
-        if objective.startswith("rank") and qid_column is None:
+        if objective is not None:
+            params = {**params, "objective": objective}
+
+        self.params = params
+
+        # try to set qid_column if not provided and we are using a ranking objective.
+        if objective is not None and objective.startswith("rank") and qid_column is None:
             qid_column = schema.select_by_tag(Tags.USER_ID).column_names[0]
         self.qid_column = qid_column
+
         self.evals_result = {}
         self.booster = booster
         self.schema = schema
@@ -291,34 +289,13 @@ class XGBoost:
         )
 
 
-OBJECTIVES = {
-    "binary:logistic": Tags.BINARY_CLASSIFICATION,
-    "reg:logistic": Tags.REGRESSION,
-    "reg:squarederror": Tags.REGRESSION,
-    "rank:pairwise": Tags.TARGET,
-    "rank:ndcg": Tags.TARGET,
-    "rank:map": Tags.TARGET,
-}
-
-
-def get_target_tag(objective: str) -> Tags:
-    """Get the target tag from the specified objective"""
-    try:
-        return OBJECTIVES[objective]
-    except KeyError as exc:
-        target_options_str = str(list(OBJECTIVES.keys()))
-        raise ValueError(f"Objective not supported. Must be one of: {target_options_str}") from exc
-
-
-def get_targets(schema: Schema, target_tag: Tags) -> List[str]:
-    """Find target columns from dataset or specified target_column"""
-    targets = schema.select_by_tag(Tags.TARGET).select_by_tag(target_tag)
+def get_targets(schema: Schema) -> List[str]:
+    """Find target columns from dataset."""
+    targets = schema.select_by_tag(Tags.TARGET)
 
     if len(targets) >= 1:
         return targets.column_names
-    raise ValueError(
-        f"No target columns in the dataset schema with tags TARGET and {target_tag.name}"
-    )
+    raise ValueError("No target columns in the dataset schema with tags TARGET.")
 
 
 def get_features(schema: Schema, target_columns: List[str]):

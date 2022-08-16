@@ -26,6 +26,7 @@ from merlin.core.dispatch import HAS_GPU
 from merlin.datasets.synthetic import generate_data
 from merlin.io import Dataset
 from merlin.models.xgb import XGBoost, dataset_to_xy
+from merlin.schema import Tags
 
 
 def test_without_dask_client(music_streaming_data: Dataset):
@@ -38,13 +39,14 @@ def test_without_dask_client(music_streaming_data: Dataset):
 @pytest.mark.usefixtures("dask_client")
 class TestXGBoost:
     def test_unsupported_objective(self, music_streaming_data: Dataset):
-        with pytest.raises(ValueError) as excinfo:
+        with pytest.raises(xgboost.core.XGBoostError) as excinfo:
             model = XGBoost(music_streaming_data.schema, objective="reg:unknown")
             model.fit(music_streaming_data)
-        assert "Objective not supported" in str(excinfo.value)
+        assert "Unknown objective" in str(excinfo)
 
     def test_music_regression(self, music_streaming_data: Dataset):
         schema = music_streaming_data.schema
+        schema = schema.excluding_by_name(["click", "like"])
         model = XGBoost(schema, objective="reg:logistic")
         model.fit(music_streaming_data)
         model.predict(music_streaming_data)
@@ -54,9 +56,8 @@ class TestXGBoost:
 
     def test_ecommerce_click(self, ecommerce_data: Dataset):
         schema = ecommerce_data.schema
-        model = XGBoost(
-            schema, target_columns=["click"], objective="binary:logistic", eval_metric="auc"
-        )
+        schema = schema.excluding_by_name(["conversion"])
+        model = XGBoost(schema, objective="binary:logistic", eval_metric="auc")
         model.fit(ecommerce_data)
         model.predict(ecommerce_data)
         metrics = model.evaluate(ecommerce_data)
@@ -65,9 +66,8 @@ class TestXGBoost:
 
     def test_social_click(self, social_data: Dataset):
         schema = social_data.schema
-        model = XGBoost(
-            schema, target_columns=["click"], objective="binary:logistic", eval_metric=["auc"]
-        )
+        schema = schema.excluding_by_name(["like", "comment", "share", "hide"])
+        model = XGBoost(schema, objective="binary:logistic", eval_metric=["auc"])
         model.fit(social_data)
         model.predict(social_data)
         metrics = model.evaluate(social_data)
@@ -85,9 +85,9 @@ class TestXGBoost:
 
     def test_ndcg(self, social_data: Dataset):
         schema = social_data.schema
+        schema = schema.excluding_by_name(["like", "comment", "share", "hide"])
         model = XGBoost(
             schema,
-            target_columns="click",
             qid_column="user_id",
             objective="rank:ndcg",
             eval_metric=["auc", "ndcg", "map"],
@@ -100,9 +100,9 @@ class TestXGBoost:
 
     def test_pairwise(self, social_data: Dataset):
         schema = social_data.schema
+        schema = schema.excluding_by_name(["like", "comment", "share", "hide"])
         model = XGBoost(
             schema,
-            target_columns=["click"],
             qid_column="user_id",
             objective="rank:pairwise",
             eval_metric=["ndcg", "auc", "map"],
@@ -125,6 +125,7 @@ def test_gpu_hist_dmatrix(
     mock_train, fit_kwargs, expected_dtrain_cls, dask_client, music_streaming_data: Dataset
 ):
     schema = music_streaming_data.schema
+    schema = schema.excluding_by_name(["click", "like"])
     model = XGBoost(schema, objective="reg:logistic", tree_method="gpu_hist")
     model.fit(music_streaming_data, **fit_kwargs)
     model.predict(music_streaming_data)
@@ -227,7 +228,10 @@ def test_predict_without_target(dask_client):
     valid_ds = Dataset(df.iloc[40:])
     test_ds = Dataset(df.iloc[40:].drop(columns="target"))
 
-    model = XGBoost(schema=train_ds.schema, target_columns="target")
+    schema = train_ds.schema
+    schema["target"] = schema["target"].with_tags([Tags.TARGET, Tags.REGRESSION])
+
+    model = XGBoost(schema=train_ds.schema)
     model.fit(train_ds, evals=[(valid_ds, "validation_set")])
     model.predict(test_ds)
 
