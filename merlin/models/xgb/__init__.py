@@ -70,6 +70,8 @@ class XGBoost:
         qid_column : Optional[str]
             For ranking objectives. The query ID column. If not provided will use
             the user ID (tagged with merlin.schema.Tags.USER_ID) column.
+        booster: Optional[xgb.Booster]
+            A Booster object to create with. If reloading from a previously trained model.
         objective : str
             The XGBoost objective to use. List of XGBoost objective functions:
             https://xgboost.readthedocs.io/en/stable/gpu/index.html#objective-functions
