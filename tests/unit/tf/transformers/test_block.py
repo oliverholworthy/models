@@ -51,7 +51,7 @@ def test_retrieval_transformer(sequence_testing_data: Dataset, run_eagerly):
 
     target = sequence_testing_data.schema.select_by_tag(Tags.ITEM_ID).column_names[0]
     predict_last = mm.SequencePredictLast(schema=seq_schema, target=target)
-    loader = Loader(sequence_testing_data, batch_size=16, shuffle=False)
+    loader = Loader(sequence_testing_data, batch_size=8, shuffle=False)
 
     query_schema = seq_schema
     output_schema = seq_schema.select_by_name(target)
@@ -83,33 +83,18 @@ def test_retrieval_transformer(sequence_testing_data: Dataset, run_eagerly):
         fit_kwargs={"pre": predict_last},
     )
 
-    x, _ = loader.peek()
+    predictions = model.predict(loader)
+    assert list(predictions.shape) == [100, 101]
 
-    predictions = model(x)
-    assert list(predictions.shape) == [16, 101]
+    query_embeddings = query_encoder.predict(loader)
+    assert list(query_embeddings.shape) == [100, d_model]
 
-    query_embeddings = query_encoder(x)
-    assert list(query_embeddings.shape) == [16, d_model]
-
-    item_embeddings = model.last.to_call.embeddings
+    item_embeddings = model.candidate_embeddings().compute().to_numpy()
 
     assert list(item_embeddings.shape) == [101, d_model]
+    predicitons_2 = tf.matmul(tf.constant(query_embeddings), tf.constant(item_embeddings.T))
 
-    # run dot product with TF on GPU
-    predictions_tf_gpu = tf.matmul(query_embeddings, tf.transpose(item_embeddings))
-    assert tf.experimental.numpy.allclose(predictions, predictions_tf_gpu, atol=1e-4)
-    np.testing.assert_allclose(predictions.numpy(), predictions_tf_gpu.numpy(), atol=1e-4)
-
-    # run dot product with TF on CPU
-    assert list(item_embeddings.shape) == [101, d_model]
-    with tf.device("/cpu:0"):
-        predictions_tf_cpu = tf.matmul(tf.constant(query_embeddings.numpy()), tf.transpose(tf.constant(item_embeddings.numpy())))
-    assert tf.experimental.numpy.allclose(predictions, predictions_tf_cpu, atol=1e-4)
-    np.testing.assert_allclose(predictions.numpy(), predictions_tf_cpu.numpy(), atol=1e-4)
-
-    # run dot product with NumPy
-    predictions_np = np.dot(query_embeddings.numpy(), item_embeddings.numpy().T)
-    np.testing.assert_allclose(predictions.numpy(), predictions_np, atol=1e-4)
+    np.testing.assert_allclose(predictions, predicitons_2, atol=1e-4)
 
 
 def test_transformer_encoder():
