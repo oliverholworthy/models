@@ -81,13 +81,22 @@ def test_retrieval_transformer(sequence_testing_data: Dataset, run_eagerly):
     item_embeddings = model.last.to_call.embeddings
 
     assert list(item_embeddings.shape) == [101, d_model]
-    predictions_2 = tf.matmul(query_embeddings, tf.transpose(item_embeddings))
 
-    assert tf.experimental.numpy.allclose(predictions, predictions_2, atol=1e-4)
-    np.testing.assert_allclose(predictions.numpy(), predictions_2.numpy(), atol=1e-4)
+    # run dot product with TF on GPU
+    predictions_tf_gpu = tf.matmul(query_embeddings, tf.transpose(item_embeddings))
+    assert tf.experimental.numpy.allclose(predictions, predictions_tf_gpu, atol=1e-4)
+    np.testing.assert_allclose(predictions.numpy(), predictions_tf_gpu.numpy(), atol=1e-4)
 
-    predictions_3 = np.dot(query_embeddings.numpy(), item_embeddings.numpy().T)
-    np.testing.assert_allclose(predictions.numpy(), predictions_3, atol=1e-4)
+    # run dot product with TF on CPU
+    assert list(item_embeddings.shape) == [101, d_model]
+    with tf.device("/cpu:0"):
+        predictions_tf_cpu = tf.matmul(tf.constant(query_embeddings.numpy()), tf.transpose(tf.constant(item_embeddings.numpy())))
+    assert tf.experimental.numpy.allclose(predictions, predictions_tf_cpu, atol=1e-4)
+    np.testing.assert_allclose(predictions.numpy(), predictions_tf_cpu.numpy(), atol=1e-4)
+
+    # run dot product with NumPy
+    predictions_np = np.dot(query_embeddings.numpy(), item_embeddings.numpy().T)
+    np.testing.assert_allclose(predictions.numpy(), predictions_np, atol=1e-4)
 
 
 def test_transformer_encoder():
