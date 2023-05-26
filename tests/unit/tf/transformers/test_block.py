@@ -32,12 +32,12 @@ def test_random_embeddings():
     item_embeddings = tf.random.uniform((100, 48)).numpy()
 
     with tf.device("/cpu:0"):
-        predictions_cpu = tf.matmul(tf.constant(query_embeddings), tf.transpose(tf.constant(item_embeddings)))
+        preds_cpu = tf.matmul(tf.constant(query_embeddings), tf.transpose(tf.constant(item_embeddings)))
 
     with tf.device("/gpu:0"):
-        predictions_gpu = tf.matmul(tf.constant(query_embeddings), tf.transpose(tf.constant(item_embeddings)))
-
-    assert tf.experimental.numpy.allclose(predictions_cpu, predictions_gpu, atol=1e-4)
+        preds_gpu = tf.matmul(tf.constant(query_embeddings), tf.transpose(tf.constant(item_embeddings)))
+    
+    np.testing.assert_allclose(preds_gpu.numpy(), preds_cpu.numpy(), atol=1e-5)
 
 
 @pytest.mark.parametrize("run_eagerly", [True])
