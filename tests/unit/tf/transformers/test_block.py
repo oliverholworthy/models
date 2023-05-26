@@ -38,7 +38,7 @@ def test_retrieval_transformer(sequence_testing_data: Dataset, run_eagerly):
 
     target = sequence_testing_data.schema.select_by_tag(Tags.ITEM_ID).column_names[0]
     predict_last = mm.SequencePredictLast(schema=seq_schema, target=target)
-    loader = Loader(sequence_testing_data, batch_size=8, shuffle=False)
+    loader = Loader(sequence_testing_data, batch_size=16, shuffle=False)
 
     query_schema = seq_schema
     output_schema = seq_schema.select_by_name(target)
@@ -70,18 +70,24 @@ def test_retrieval_transformer(sequence_testing_data: Dataset, run_eagerly):
         fit_kwargs={"pre": predict_last},
     )
 
-    predictions = model.predict(loader)
-    assert list(predictions.shape) == [100, 101]
+    x, _ = loader.peek()
 
-    query_embeddings = query_encoder.predict(loader)
-    assert list(query_embeddings.shape) == [100, d_model]
+    predictions = model(x)
+    assert list(predictions.shape) == [16, 101]
 
-    item_embeddings = model.last.to_call.embeddings.numpy()
+    query_embeddings = query_encoder(x)
+    assert list(query_embeddings.shape) == [16, d_model]
+
+    item_embeddings = model.last.to_call.embeddings
 
     assert list(item_embeddings.shape) == [101, d_model]
-    predicitons_2 = np.dot(query_embeddings, item_embeddings.T)
+    predictions_2 = tf.matmul(query_embeddings, tf.transpose(item_embeddings))
 
-    np.testing.assert_allclose(predictions, predicitons_2, atol=1e-4)
+    assert tf.experimental.numpy.allclose(predictions, predictions_2, atol=1e-4)
+    np.testing.assert_allclose(predictions.numpy(), predictions_2.numpy(), atol=1e-4)
+
+    predictions_3 = np.dot(query_embeddings.numpy(), item_embeddings.numpy().T)
+    np.testing.assert_allclose(predictions.numpy(), predictions_3, atol=1e-4)
 
 
 def test_transformer_encoder():
