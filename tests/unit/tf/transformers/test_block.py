@@ -27,6 +27,19 @@ def test_import():
     assert transformers is not None
 
 
+def test_random_embeddings():
+    query_embeddings = tf.random.uniform((16, 48)).numpy()
+    item_embeddings = tf.random.uniform((100, 48)).numpy()
+
+    with tf.device("/cpu:0"):
+        predictions_cpu = tf.matmul(tf.constant(query_embeddings), tf.transpose(tf.constant(item_embeddings)))
+
+    with tf.device("/gpu:0"):
+        predictions_gpu = tf.matmul(tf.constant(query_embeddings), tf.transpose(tf.constant(item_embeddings)))
+
+    assert tf.experimental.numpy.allclose(predictions_cpu, predictions_gpu, atol=1e-4)
+
+
 @pytest.mark.parametrize("run_eagerly", [True])
 def test_retrieval_transformer(sequence_testing_data: Dataset, run_eagerly):
     set_random_seed(42)
