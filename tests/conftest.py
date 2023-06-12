@@ -113,12 +113,7 @@ def pytest_collection_modifyitems(items):
                 always = always[len("/models/") :]
 
             if f"/unit/{always}" in path:
-                item.add_marker(pytest.mark.always)
-                item.add_marker(pytest.mark.changed)
-                for value in ci_utils.BACKEND_ALIASES.values():
-                    item.add_marker(getattr(pytest.mark, value))
-                for marker in ci_utils.OTHER_MARKERS:
-                    item.add_marker(getattr(pytest.mark, marker))
+                item.add_marker(pytest.mark.shared)
 
 
 def get_benchmark_info():
