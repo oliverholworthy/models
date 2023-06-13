@@ -88,11 +88,11 @@ train = Dataset(PATH_TO_TRAIN_DATA)
 valid = Dataset(PATH_TO_VALID_DATA)
 
 model = mm.DLRMModel(
-    train.schema,                                                   # 1
+    train.schema,                                                      # 1
     embedding_dim=64,
-    bottom_block=mm.MLPBlock([128, 64]),                            # 2
+    bottom_block=mm.MLPBlock([128, 64]),                               # 2
     top_block=mm.MLPBlock([128, 64, 32]),
-    prediction_tasks=mm.BinaryClassificationTask(train.schema)      # 3
+    prediction_tasks=mm.BinaryClassificationTask(target=train.schema)  # 3
 )
 
 model.compile(optimizer="adagrad", run_eagerly=False)
